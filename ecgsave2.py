@@ -6,6 +6,10 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import torchvision
+import torch.utils.data as Data
+from torch.autograd import Variable
+from Net import *
 
 # 文件路径
 ROOT = "E:/deeplearning/apnea-ecg-database-1.0.0/"
@@ -90,14 +94,65 @@ for i in range(len(TRAIN_FILENAME)):
     else:
         ecg=torch.cat((ecg,tmpecg),dim=0)
         nums=torch.cat((nums,tmpnum),dim=0)
-print(ecg.size())
-print(ecg.size(0)/6000)
-print(nums.size())
+# print(ecg.size())
+# print(ecg.size(0)/6000)
+# print(nums.size())
 ecg=ecg.view(17023,6000,1)
-print(ecg.size())
-ecg=ecg.squeeze()
-plt.figure(1)
-plt.plot(ecg[1][:])
-plt.figure(2)
-plt.plot(ecg[2][:])
-plt.show()
+ecg=ecg.permute(0,2,1) #[17023,1,6000]
+
+
+#分批加载训练
+# #生成数据集
+full_data=Data.TensorDataset(ecg,nums)
+print(full_data)
+# #数据集划分
+train_data,test_data=Data.random_split(full_data,[13600,3423])
+# print(test_data[:][1].size()) #[3423]
+#数据加载
+train_loader=Data.DataLoader(dataset=train_data,batch_size=32,shuffle=True)
+test_loader=Data.DataLoader(dataset=test_data,batch_size=100)
+#模型加载
+cnn=BN_CNN5()
+#优化设置
+optimizer=torch.optim.Adam(cnn.parameters(),lr=0.02)
+loss_func=torch.nn.CrossEntropyLoss()
+
+#训练
+print('training...')
+for epoch in range(10):
+    for i,(x,y) in enumerate(train_loader):
+        x,y=Variable(x),Variable(y)
+        # print('times:',i+1,'x size:',x.data.size(),'y size:',y.data.size())
+        # 425个批次  每个批次32batch
+        out=cnn(x)
+        loss=loss_func(out,y)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        print(epoch,i)
+
+#测试准确度
+print('testing...')
+for i,(test_x,test_y) in enumerate(test_loader):
+    test_out=cnn(Variable(test_x))
+    pred_y=torch.max(test_out,1)[1].data.numpy().squeeze()
+    test_y=test_y.data.numpy()
+    acc=sum(pred_y==test_y)/len(pred_y)
+    print(acc)
+#结果
+'''
+模型|    优化器    |    batch    |    epoch    |准确率
+MLP
+CNN5      SGD 0.02        32              1       0.7
+CNN5      SGD 0.02        32              3       0.8
+CNN5      SGD 0.02        32              10      0.85
+CNN5      SGD 0.02        136             10      0.72
+CNN5      SGD 0.05        136             10      0.81
+CNN5      SGD 0.05        32              10      0.77
+BN_CNN5   SGD 0.05        136             10      0.85
+BN_cnn5   SGD 0.1         136             10      0.84
+BN_CNN5   SGD 0.02        32              10      0.88
+BN_CNN5   ADAM 0.02       32              10      0.87
+ResNet18  SGD 0.02        32              10      0.75
+Rnn         ADAM 0.02       32             10       0.6
+'''

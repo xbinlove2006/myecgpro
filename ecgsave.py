@@ -1,4 +1,3 @@
-
 # 将所有的ecg记录和标注存为txt文件
 
 import wfdb
@@ -6,6 +5,10 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
+import torchvision
+import torch.utils.data as Data
+from torch.autograd import Variable
+from Net import *
 
 # 文件路径
 ROOT = "E:/deeplearning/apnea-ecg-database-1.0.0/"
@@ -61,28 +64,78 @@ def ann2num(ann, ann_dict):
     return num
 
 
-
 # print(path)
-ecg=[]
-sample=[]
-symbol=[]
-nums=[]
+ecg = None
+sample = None
+symbol = None
+nums = None
 print('start')
 for i in range(len(TRAIN_FILENAME)):
-	path=ROOT+TRAIN_FILENAME[i]
-	tmpecg=wfdb.rdrecord(path).p_signal
-	ann=wfdb.rdann(path,'apn')
-	tmpsymbol=ann.symbol#'A','N'
-	tmpnum=ann2num(tmpsymbol,ANN_DICT)#'A','N'转1,0
-	tmpsample=ann.sample#标注  对应  ecg信号的起点
-	for j in range(TRAIN_LABEL_AMOUNT[i]):#将1分钟的ecg信号放入数组
-		if tmpsample[j]+6000<=len(tmpecg) and j<TRAIN_LABEL_AMOUNT[i]:
-			ecg.append(tmpecg[tmpsample[j]:tmpsample[j]+6000])
-			nums.append(tmpnum[j])
+    path = ROOT+TRAIN_FILENAME[i]
+    tmpecg = wfdb.rdrecord(path).p_signal
+    ann = wfdb.rdann(path, 'apn')
+    tmpsymbol = ann.symbol  # 'A','N'
+    tmpnum = ann2num(tmpsymbol, ANN_DICT)  # 'A','N'转1,0
+    tmpsample = ann.sample  # 标注  对应  ecg信号的起点
+    if (len(tmpecg)//6000)>len(tmpnum):
+        tmpecg=tmpecg[:len(tmpnum)*6000]
+        tmpnum=tmpnum[:len(tmpecg)//6000]
+        print(i,'ecg',len(tmpecg)/6000,'num',len(tmpnum))
+    else:
+        tmpnum=tmpnum[:len(tmpecg)//6000]
+        tmpecg=tmpecg[:len(tmpnum)*6000]
+        print(i,'ecg',len(tmpecg)/6000,'num',len(tmpnum))
+    tmpecg=torch.FloatTensor(tmpecg)
+    tmpnum=torch.LongTensor(tmpnum)
+    if i == 0:
+        ecg = tmpecg
+        nums = tmpnum
+    else:
+        ecg=torch.cat((ecg,tmpecg),dim=0)
+        nums=torch.cat((nums,tmpnum),dim=0)
+# print(ecg.size())
+# print(ecg.size(0)/6000)
+# print(nums.size())
+ecg=ecg.view(17023,6000,1)
+# ecg=ecg.permute(0,2,1) #[17023,1,6000]
+ecg=ecg.squeeze() #为了匹配rnn模型 [17023,1,6000]=>[17023,6000]=>[17023,60,100]
+ecg=ecg.view(17023,60,100)#[17023,60,100]
 
-# print(ecg)
-print(len(ecg[0]),len(ecg[1]))
-print(len(nums))
-print('end')
-plt.plot(ecg[1][:600])
-plt.show()
+#分批加载训练
+# #生成数据集
+full_data=Data.TensorDataset(ecg,nums)
+print(full_data)
+# #数据集划分
+train_data,test_data=Data.random_split(full_data,[13600,3423])
+# print(test_data[:][1].size()) #[3423]
+#数据加载
+train_loader=Data.DataLoader(dataset=train_data,batch_size=32,shuffle=True)
+test_loader=Data.DataLoader(dataset=test_data,batch_size=100)
+#模型加载
+cnn=Rnn()
+#优化设置
+optimizer=torch.optim.SGD(cnn.parameters(),lr=0.02)
+loss_func=torch.nn.CrossEntropyLoss()
+
+#训练
+print('training...')
+for epoch in range(10):
+    for i,(x,y) in enumerate(train_loader):
+        x,y=Variable(x),Variable(y)
+        # print('times:',i+1,'x size:',x.data.size(),'y size:',y.data.size())
+        # 425个批次  每个批次32batch
+        out=cnn(x)
+        loss=loss_func(out,y)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        print(epoch,i)
+
+#测试准确度
+print('testing...')
+for i,(test_x,test_y) in enumerate(test_loader):
+    test_out=cnn(Variable(test_x))
+    pred_y=torch.max(test_out,1)[1].data.numpy().squeeze()
+    test_y=test_y.data.numpy()
+    acc=sum(pred_y==test_y)/len(pred_y)
+    print(acc)
