@@ -112,7 +112,7 @@ train_data,test_data=Data.random_split(full_data,[13600,3423])
 train_loader=Data.DataLoader(dataset=train_data,batch_size=32,shuffle=True)
 test_loader=Data.DataLoader(dataset=test_data,batch_size=100)
 #模型加载
-cnn=Rnn()
+cnn=Lstm_layer5()
 #优化设置
 optimizer=torch.optim.SGD(cnn.parameters(),lr=0.02)
 loss_func=torch.nn.CrossEntropyLoss()

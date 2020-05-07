@@ -15,9 +15,20 @@ rnn 就是一个普通的3层神经网络与一个2层的神经网络组合而�
 相加后得到的16是本层记忆层的输出，作为下一层记忆层的输入
 传播后得到的2分类结果 是每层的预测结果，对于本ecg信号来说  只需要最后一次的预测结果即可
 '''
-rnn=nn.RNN(100,16)
-x=torch.randn(60,1,100)
-out,h=rnn(x)
-out=nn.Linear(16,2)(out)
-print(out.size())
+# rnn=nn.RNN(100,16)
+# x=torch.randn(60,32,100)
+# out,h=rnn(x)
+# print(out.size())
+# print('out:',out[-1].size())
+# # print(out[-1])
+# print('h:',h.size())
+# # print(h)
+# out=nn.Linear(16,2)(out)
+# print(out.size())
 
+lstm=nn.LSTM(100,16)
+x=torch.randn(60,32,100)
+out,(h,c)=lstm(x)
+print(out.size())
+print(h.size())
+print(c.size())

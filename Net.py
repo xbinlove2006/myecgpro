@@ -204,14 +204,60 @@ class Rnn(nn.Module):
         return out
 
 
+class Rnn_layer5(nn.Module):
+    def __init__(self):
+        super(Rnn_layer5,self).__init__()
+        self.rnn=nn.Sequential(
+            nn.RNN(input_size=100,hidden_size=512,num_layers=5,batch_first=True)
+        )
+        self.fc=nn.Sequential(
+            nn.Linear(512,128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Linear(128,32),
+            nn.BatchNorm1d(32),
+            nn.ReLU(),
+            nn.Linear(32,16),
+            nn.BatchNorm1d(16),
+            nn.ReLU(),
+            nn.Linear(16,2)
+        )
+    def forward(self,x):
+        out,h=self.rnn(x)
+        out=self.fc(out[:,-1,:])# 因为默认out[32,60,2] 只需要用到最后一个out
+        return out
+
+class Lstm_layer5(nn.Module):
+    def __init__(self):
+        super(Lstm_layer5,self).__init__()
+        self.lstm=nn.Sequential(
+            nn.LSTM(100,512,num_layers=5,batch_first=True)
+        )
+        self.fc=nn.Sequential(
+                nn.Linear(512,128),
+                nn.BatchNorm1d(128),
+                nn.ReLU(),
+                nn.Linear(128,32),
+                nn.BatchNorm1d(32),
+                nn.ReLU(),
+                nn.Linear(32,16),
+                nn.BatchNorm1d(16),
+                nn.ReLU(),
+                nn.Linear(16,2)
+            )
+    def forward(self,x):
+        out,(h,c)=self.lstm(x)
+        out=self.fc(out[:,-1,:])# 因为默认out[32,60,2] 只需要用到最后一个out
+        return out
+    pass
+
 
 def main():
     ecg=torch.randn(32,60,100)
-    rnn=Rnn()
+    rnn=Lstm_layer5()
     print(rnn)
-    y,h=rnn(ecg)
+    y=rnn(ecg)
     print(y.size())
-    print(h.size())
     
     pass
 
