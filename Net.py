@@ -186,21 +186,17 @@ class Rnn(nn.Module):
         self.rnn=nn.Sequential(
             nn.RNN(input_size=100,hidden_size=128,num_layers=1,batch_first=True)
         )
-        self.fc=nn.Sequential(
-            nn.Linear(128,64),
-            nn.BatchNorm1d(64),
-            nn.ReLU(),
-            nn.Linear(64,32),
-            nn.BatchNorm1d(32),
-            nn.ReLU(),
-            nn.Linear(32,16),
-            nn.BatchNorm1d(16),
-            nn.ReLU(),
-            nn.Linear(16,2)
-        )
+        self.fc=nn.Linear(128,2)
+        self.fc2=nn.Linear(60*2,2)
+
     def forward(self,x):
         out,h=self.rnn(x)
-        out=self.fc(out[:,-1,:])# 因为默认out[32,60,2] 只需要用到最后一个out
+        # out=self.fc(out[:,-1,:])# 因为默认out[32,60,2] 只需要用到最后一个out
+        #仅适用最后一个out 效果极差  只有60-65%
+        #尝试把所有out[batch,60,128]聚合
+        out=self.fc(out) #[batch,60,2]
+        out=out.view(out.size(0),-1)#[batch,120]
+        out=self.fc2(out)
         return out
 
 
@@ -210,18 +206,7 @@ class Rnn_layer5(nn.Module):
         self.rnn=nn.Sequential(
             nn.RNN(input_size=100,hidden_size=512,num_layers=5,batch_first=True)
         )
-        self.fc=nn.Sequential(
-            nn.Linear(512,128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Linear(128,32),
-            nn.BatchNorm1d(32),
-            nn.ReLU(),
-            nn.Linear(32,16),
-            nn.BatchNorm1d(16),
-            nn.ReLU(),
-            nn.Linear(16,2)
-        )
+        self.fc=nn.Linear(512,2)
     def forward(self,x):
         out,h=self.rnn(x)
         out=self.fc(out[:,-1,:])# 因为默认out[32,60,2] 只需要用到最后一个out
@@ -254,11 +239,9 @@ class Lstm_layer5(nn.Module):
 
 def main():
     ecg=torch.randn(32,60,100)
-    rnn=Lstm_layer5()
-    print(rnn)
-    y=rnn(ecg)
-    print(y.size())
-    
+    rnn=Rnn()
+    out=rnn(ecg)
+    print(out.size())
     pass
 
 

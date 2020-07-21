@@ -9,7 +9,7 @@ import torch
 import torchvision
 import torch.utils.data as Data
 from torch.autograd import Variable
-from Net import *
+from CNNNET import *
 
 # 文件路径
 ROOT = "E:/deeplearning/apnea-ecg-database-1.0.0/"
@@ -96,10 +96,10 @@ for i in range(len(TRAIN_FILENAME)):
         nums=torch.cat((nums,tmpnum),dim=0)
 # print(ecg.size())
 # print(ecg.size(0)/6000)
-# print(nums.size())
+# print('nums size:',nums.size())#[17023]
 ecg=ecg.view(17023,6000,1)
 ecg=ecg.permute(0,2,1) #[17023,1,6000]
-
+# exit()
 
 #分批加载训练
 # #生成数据集
@@ -112,14 +112,20 @@ train_data,test_data=Data.random_split(full_data,[13600,3423])
 train_loader=Data.DataLoader(dataset=train_data,batch_size=32,shuffle=True)
 test_loader=Data.DataLoader(dataset=test_data,batch_size=100)
 #模型加载
-cnn=BN_CNN5()
+cnn=ResNet18()
 #优化设置
 optimizer=torch.optim.Adam(cnn.parameters(),lr=0.02)
 loss_func=torch.nn.CrossEntropyLoss()
 
+#模型保存地址
+model_dir='E:/deeplearning/myecgpro/model_save/resnet18.pth'
+
 #训练
 print('training...')
-for epoch in range(10):
+maxacc=0
+maxnum=0
+maxtotal=0
+for epoch in range(50):
     for i,(x,y) in enumerate(train_loader):
         x,y=Variable(x),Variable(y)
         # print('times:',i+1,'x size:',x.data.size(),'y size:',y.data.size())
@@ -129,7 +135,38 @@ for epoch in range(10):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        print(epoch,i)
+        print('训练进度',epoch,i)
+    #每10轮 测试准确度 保存最高的准确度模型
+    if epoch%1==0:
+        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        epochacc=0
+        epochnum=0
+        epochtotal=0
+        for i,(test_x,test_y) in enumerate(test_loader):
+            test_out=cnn(Variable(test_x))
+            pred_y=torch.max(test_out,1)[1].data.numpy().squeeze()
+            test_y=test_y.data.numpy()
+            # acc=sum(pred_y==test_y)/len(pred_y)
+            epoch_acc_num=sum(pred_y==test_y)
+            epoch_total_num=len(pred_y)
+            epochnum=epochnum+epoch_acc_num
+            epochtotal=epochtotal+epoch_total_num
+            # print(acc)
+            # epochacc=epochacc+acc
+
+            print('current num:',epochnum,'max num:',maxnum)
+        #模型保存
+        if epochnum>maxnum :
+            maxnum=epochnum
+            maxtotal=epochtotal
+            state={'net':cnn.state_dict(),'optim':optimizer.state_dict(),'epoch':epoch,'maxnum':maxnum,'maxtotal':maxtotal}
+            torch.save(state,model_dir)
+            print('success save!')
+        elif epochnum<maxnum and epochnum/maxnum<=0.9 : 
+            print('break circle!')
+            break
+
+
 
 #测试准确度
 print('testing...')
@@ -139,6 +176,15 @@ for i,(test_x,test_y) in enumerate(test_loader):
     test_y=test_y.data.numpy()
     acc=sum(pred_y==test_y)/len(pred_y)
     print(acc)
+
+
+#加载模型
+# checkpoint = torch.load(model_dir)
+# cnn.load_state_dict(checkpoint['net'])
+# optimizer.load_state_dict(checkpoint['optimizer'])
+# start_epoch = checkpoint['epoch'] + 1
+
+
 #结果
 '''
 模型|    优化器    |    batch    |    epoch    |准确率

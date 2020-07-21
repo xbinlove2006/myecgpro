@@ -112,14 +112,18 @@ train_data,test_data=Data.random_split(full_data,[13600,3423])
 train_loader=Data.DataLoader(dataset=train_data,batch_size=32,shuffle=True)
 test_loader=Data.DataLoader(dataset=test_data,batch_size=100)
 #模型加载
-cnn=Lstm_layer5()
+cnn=Rnn()
 #优化设置
 optimizer=torch.optim.SGD(cnn.parameters(),lr=0.02)
 loss_func=torch.nn.CrossEntropyLoss()
-
+#模型保存地址
+model_dir='E:/deeplearning/myecgpro/model_save/rnn.pth'
 #训练
 print('training...')
-for epoch in range(10):
+maxacc=0
+maxnum=0
+maxtotal=0
+for epoch in range(50):
     for i,(x,y) in enumerate(train_loader):
         x,y=Variable(x),Variable(y)
         # print('times:',i+1,'x size:',x.data.size(),'y size:',y.data.size())
@@ -130,12 +134,34 @@ for epoch in range(10):
         loss.backward()
         optimizer.step()
         print(epoch,i)
+    #每10轮 测试准确度 保存最高的准确度模型
+    if epoch%1==0:
+        print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+        epochacc=0
+        epochnum=0
+        epochtotal=0
+        for i,(test_x,test_y) in enumerate(test_loader):
+            test_out=cnn(Variable(test_x))
+            pred_y=torch.max(test_out,1)[1].data.numpy().squeeze()
+            test_y=test_y.data.numpy()
+            # acc=sum(pred_y==test_y)/len(pred_y)
+            epoch_acc_num=sum(pred_y==test_y)
+            epoch_total_num=len(pred_y)
+            epochnum=epochnum+epoch_acc_num
+            epochtotal=epochtotal+epoch_total_num
+            # print(acc)
+            # epochacc=epochacc+acc
 
+            print('current num:',epochnum,'max num:',maxnum)
+        #模型保存
+        if epochnum>maxnum :
+            maxnum=epochnum
+            maxtotal=epochtotal
+            state={'net':cnn.state_dict(),'optim':optimizer.state_dict(),'epoch':epoch,'maxnum':maxnum,'maxtotal':maxtotal}
+            torch.save(state,model_dir)
+            print('success save!')
+        elif epochnum<maxnum and epochnum/maxnum<=0.9 : 
+            print('break circle!')
+            break
 #测试准确度
-print('testing...')
-for i,(test_x,test_y) in enumerate(test_loader):
-    test_out=cnn(Variable(test_x))
-    pred_y=torch.max(test_out,1)[1].data.numpy().squeeze()
-    test_y=test_y.data.numpy()
-    acc=sum(pred_y==test_y)/len(pred_y)
-    print(acc)
+print('testing acc...',maxnum/maxtotal)
