@@ -194,9 +194,12 @@ class Rnn(nn.Module):
         # out=self.fc(out[:,-1,:])# 因为默认out[32,60,2] 只需要用到最后一个out
         #仅适用最后一个out 效果极差  只有60-65%
         #尝试把所有out[batch,60,128]聚合
-        out=self.fc(out) #[batch,60,2]
-        out=out.view(out.size(0),-1)#[batch,120]
-        out=self.fc2(out)
+        # out=self.fc(out) #[batch,60,2]
+        # out=out.view(out.size(0),-1)#[batch,120]
+        # out=self.fc2(out)
+        #效果64%
+
+        
         return out
 
 
